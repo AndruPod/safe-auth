@@ -72,7 +72,7 @@ $ npm run docker:up
 $ npm run docker:down
 ```
 
-## Part 2 – Scaling Authentication
+## Part 2 – What If
 
 To handle thousands of registrations or 100k logins per second, I’d make the service stateless and run multiple instances behind a load balancer. User data goes into a scalable DB like PostgreSQL (with sharding) or Cassandra. Passwords are hashed. JWTs and refresh tokens are stored in Redis for fast access. For huge registration spikes, use a queue (Kafka/RabbitMQ) to write to the database asynchronously. Rate limiting and monitoring help manage traffic.
 
