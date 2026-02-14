@@ -1,0 +1,27 @@
+# Node
+node_modules/
+dist/
+npm-debug.log
+yarn-error.log
+
+# TypeScript
+*.tsbuildinfo
+
+# Logs
+*.log
+
+# Coverage
+coverage/
+coverage-e2e/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Docker
+docker-compose.override.yml
+
+# IDE
+.vscode/
+.idea/

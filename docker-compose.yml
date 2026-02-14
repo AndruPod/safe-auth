@@ -1,0 +1,100 @@
+#version: '3.9'
+#
+#services:
+#  app:
+#    build: .
+#    container_name: nest-app
+#    restart: unless-stopped
+#    ports:
+#      - "3000:3000"
+#    environment:
+#      NODE_ENV: development
+#      PORT: 3000
+#      DATABASE_URL: postgres://postgres:postgres@db:5432/nestdb
+#      REDIS_HOST: redis
+#      REDIS_PORT: 6379
+#      JWT_SECRET: supersecretkey
+#      JWT_REFRESH_SECRET: superrefreshkey
+#    depends_on:
+#      - db
+#      - redis
+#    volumes:
+#      - .:/usr/src/app
+#    command: sh -c "npx wait-port db:5432 && npx drizzle-kit push && npm run start:dev"
+#
+#
+#  db:
+#    image: postgres:15
+#    container_name: nest-postgres
+#    restart: unless-stopped
+#    environment:
+#      POSTGRES_USER: postgres
+#      POSTGRES_PASSWORD: postgres
+#      POSTGRES_DB: nestdb
+#    ports:
+#      - "5433:5432"   # хост 5433, контейнер 5432
+#    volumes:
+#      - pgdata:/var/lib/postgresql/data
+#
+#  redis:
+#    image: redis:7
+#    container_name: nest-redis
+#    restart: unless-stopped
+#    ports:
+#      - "6380:6379"   # хост 6380, контейнер 6379
+#    volumes:
+#      - redisdata:/data
+#
+#volumes:
+#  pgdata:
+#  redisdata:
+
+version: '3.9'
+
+services:
+  app:
+    build: .
+    container_name: nest-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      DATABASE_URL: postgres://postgres:postgres@db:5432/nestdb
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: supersecretkey
+      JWT_REFRESH_SECRET: superrefreshkey
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - .:/usr/src/app
+    command: sh -c "npx wait-port db:5432 && npx drizzle-kit push && npm run start:dev"
+
+  db:
+    image: postgres:15
+    container_name: nest-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: nestdb
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    container_name: nest-redis
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    volumes:
+      - redisdata:/data
+
+volumes:
+  pgdata:
+  redisdata:
