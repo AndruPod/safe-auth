@@ -1,84 +1,94 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Safe Auth Service
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+A production-ready, highly secure authentication and user management backend service built with **Nest.js**, **TypeScript**, and **Drizzle ORM**. This project demonstrates modern architectural patterns, secure token management, caching strategies, and extensive automated testing workflows.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## 🚀 Key Features
 
-## Description
+*   **Robust Authentication:** Secure SignUp and Login endpoints utilizing industry-standard password hashing (bcrypt) and validation layers.
+*   **Token Management:** Dual-token mechanism using short-lived **JWT access tokens** and secure **refresh tokens**.
+*   **High-Performance Caching:** Integrated **Redis** layer for session caching, token blacklisting, and reducing relational database overhead.
+*   **Modern Data Layer:** Implemented with **Drizzle ORM** for type-safe database queries, structured schemas, and automated migration generation.
+*   **Dockerized Infrastructure:** Multi-container setup containing the application, PostgreSQL database, and Redis instance for seamless local orchestration.
+*   **Enterprise-Grade Testing:** Full test suite covering Unit tests (`jest`) and End-to-End (`e2e`) API integration flows with Istanbul coverage tracking.
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## 🛠️ Tech Stack
 
-## Project setup
+*   **Runtime & Framework:** Node.js, Nest.js, TypeScript
+*   **Database & ORM:** PostgreSQL, Drizzle ORM
+*   **Caching & Session:** Redis
+*   **Testing & QA:** Jest, Supertest, Istanbul (Coverage)
+*   **DevOps & Tooling:** Docker, Docker Compose, Prettier, ESLint
 
-```bash
+## 📂 Project Structure Overview
 
-$ npm install
+```text
+src/
+├── auth/           # Authentication logic (controllers, services, JWT DTOs)
+├── db/             # Database modules, Drizzle providers, schemas, and migrations
+├── users/          # User management core domain
+├── redis/          # Redis integration and caching providers
+├── app.module.ts   # Main application root module
+└── main.ts         # Application entry point & global pipes configuration
 ```
 
-## Compile and run the project
+## ⚙️ Getting Started
+### Prerequisites
 
-```bash
+Make sure you have Docker and Node.js (v18+) installed on your system.
 
-# development
-$ npm run start
+#### 1. Environment Setup
 
-# watch mode
-$ npm run start:dev
+Clone the repository and create your .env file based on the provided example:
 
-# production mode
-$ npm run start:prod
+```
+cp .env.example .env
 ```
 
-## Run tests
+Configure your JWT secrets, database credentials, and Redis ports inside the .env file.
+#### 2. Run Infrastructure via Docker
 
-```bash
-
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+Spin up the PostgreSQL database and Redis instance in the background:
+Bash
+```
+docker-compose up -d
 ```
 
-
-## Run docker-compose
-
-```bash
-
-# start docker
-$ npm run docker:up
-
-# stop docker
-$ npm run docker:down
+#### 3. Install Dependencies
+```
+npm install
 ```
 
-## Part 2 – What If
+#### 4. Database Migrations
 
-To handle thousands of registrations or 100k logins per second, I’d make the service stateless and run multiple instances behind a load balancer. User data goes into a scalable DB like PostgreSQL (with sharding) or Cassandra. Passwords are hashed. JWTs and refresh tokens are stored in Redis for fast access. For huge registration spikes, use a queue (Kafka/RabbitMQ) to write to the database asynchronously. Rate limiting and monitoring help manage traffic.
+Generate and apply Drizzle database migrations to set up your PostgreSQL schemas:
+Bash
 
-## Part 3 – Social Login
+```
+# Apply pending migrations to the database
+npm run db:migrate
+```
 
-Social login works via OAuth2. User clicks ‘Login with Google/Facebook’, gets an auth code, which the backend exchanges for user info. If the email exists → log in and return JWT; if not → create user, then return JWT. Refresh tokens still go in Redis.
+#### 5. Running the Application
+```
+# Development mode
+npm run start:dev
 
-### Sequence:
-[Client] -> auth code -> [Backend] -> exchange -> [Google] -> user info -> [Backend] -> JWT -> [Client]
+# Production mode
+npm run start:prod
+```
+
+# Testing & Code Coverage
+
+The project maintains high code quality standards backed by structured test automation runner scripts.
+```
+# Run unit tests
+npm run test
+
+# Run End-to-End (E2E) integration tests
+npm run test:e2e
+
+# Generate test coverage reports
+npm run test:cov
+```
+
+E2E test results and HTML coverage visualizers will be compiled into the /coverage and /coverage-e2e directories respectively.
