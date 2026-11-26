@@ -1,7 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
-import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 
 async function bootstrap() {
     const app = await NestFactory.create(AppModule);

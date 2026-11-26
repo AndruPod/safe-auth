@@ -6,6 +6,13 @@ import * as schema from '../db/schema';
 import { users } from '../db/schema';
 import { eq } from 'drizzle-orm';
 
+// Fields that are safe to return to a client
+const publicFields = {
+    id: users.id,
+    email: users.email,
+    createdAt: users.createdAt,
+};
+
 @Injectable()
 export class UsersService {
 
@@ -23,7 +30,7 @@ export class UsersService {
             const [user] = await this.db
                 .insert(users)
                 .values({ email, password: hashedPassword })
-                .returning();
+                .returning(publicFields);
 
             return user;
         } catch (e) {
@@ -34,7 +41,7 @@ export class UsersService {
     async findOneById(id: number) {
 
         const [user] = await this.db
-            .select()
+            .select(publicFields)
             .from(users)
             .where(eq(users.id, id));
 

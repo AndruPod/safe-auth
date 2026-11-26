@@ -4,6 +4,9 @@ import { UsersService } from '../users/users.service';
 import { JwtService } from '@nestjs/jwt';
 import { UnauthorizedException, BadRequestException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
+import { createHash } from 'crypto';
+
+const sha = (t: string) => createHash('sha256').update(t).digest('hex');
 
 jest.mock('bcrypt', () => ({
     hash: jest.fn(),
@@ -33,6 +36,7 @@ describe('AuthService', () => {
             set: jest.fn(),
             get: jest.fn(),
             del: jest.fn(),
+            eval: jest.fn().mockResolvedValue(1),
         };
 
         const module: TestingModule = await Test.createTestingModule({
@@ -114,40 +118,41 @@ describe('AuthService', () => {
             .rejects.toThrow(UnauthorizedException);
     });
 
-    it('should refresh successfully', async () => {
+    it('should rotate a valid refresh token', async () => {
         mockJwtService.verifyAsync.mockResolvedValue({ id: 1 });
-        (mockRedis.get as jest.Mock).mockResolvedValue('hashed_refresh');
-        (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+        mockRedis.get.mockResolvedValue(sha('current'));
         mockUsersService.findOneById.mockResolvedValue({ id: 1, email: 'a@test.com' });
 
-        const result = await service.refresh(1, 'refresh_token');
-        expect(result).toHaveProperty('access_token');
+        const result = await service.refresh('current');
         expect(result).toHaveProperty('refresh_token');
-        expect(mockRedis.del).toHaveBeenCalledWith(`refresh:1`);
+        expect(mockRedis.eval).toHaveBeenCalledWith(expect.any(String), 1, 'refresh:1', sha('current'));
     });
 
     it('should throw if no stored refresh token', async () => {
         mockJwtService.verifyAsync.mockResolvedValue({ id: 1 });
-        (mockRedis.get as jest.Mock).mockResolvedValue(null);
-
-        await expect(service.refresh(1, 'token')).rejects.toThrow(UnauthorizedException);
+        mockRedis.get.mockResolvedValue(null);
+        await expect(service.refresh('token')).rejects.toThrow(UnauthorizedException);
     });
 
-    it('should throw if refresh mismatch', async () => {
+    it('should reject an old token that shares the first 72 bytes', async () => {
+        const prefix = 'x'.repeat(72);
         mockJwtService.verifyAsync.mockResolvedValue({ id: 1 });
-        (mockRedis.get as jest.Mock).mockResolvedValue('hashed_refresh');
-        (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+        mockRedis.get.mockResolvedValue(sha(prefix + 'new'));
+        await expect(service.refresh(prefix + 'old')).rejects.toThrow(UnauthorizedException);
+    });
 
-        await expect(service.refresh(1, 'token')).rejects.toThrow(UnauthorizedException);
+    it('should reject a token already consumed by a parallel request', async () => {
+        mockJwtService.verifyAsync.mockResolvedValue({ id: 1 });
+        mockRedis.get.mockResolvedValue(sha('token'));
+        mockRedis.eval.mockResolvedValue(0);
+        await expect(service.refresh('token')).rejects.toThrow(UnauthorizedException);
     });
 
     it('should throw if user not found during refresh', async () => {
         mockJwtService.verifyAsync.mockResolvedValue({ id: 1 });
-        (mockRedis.get as jest.Mock).mockResolvedValue('hashed_refresh');
-        (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+        mockRedis.get.mockResolvedValue(sha('token'));
         mockUsersService.findOneById.mockResolvedValue(null);
-
-        await expect(service.refresh(1, 'token')).rejects.toThrow(UnauthorizedException);
+        await expect(service.refresh('token')).rejects.toThrow(UnauthorizedException);
     });
 
     it('should return user if token valid', async () => {
@@ -165,8 +170,9 @@ describe('AuthService', () => {
 
     it('should logout successfully', async () => {
         mockJwtService.verifyAsync.mockResolvedValue({ id: 1 });
+        mockRedis.get.mockResolvedValue(sha('refresh_token'));
         const result = await service.logout('refresh_token');
-        expect(mockRedis.del).toHaveBeenCalledWith('refresh:1');
+        expect(mockRedis.eval).toHaveBeenCalled();
         expect(result).toEqual({ message: 'Logged out' });
     });
 
@@ -175,15 +181,9 @@ describe('AuthService', () => {
         await expect(service.logout('bad')).rejects.toThrow(UnauthorizedException);
     });
 
-    it('should save refresh token', async () => {
-        (bcrypt.hash as jest.Mock).mockResolvedValue('hashed_refresh');
+    it('should store only a SHA-256 hash of the refresh token', async () => {
         await (service as any).saveRefreshToken(1, 'refresh_token');
-        expect(mockRedis.set).toHaveBeenCalledWith(
-            'refresh:1',
-            'hashed_refresh',
-            'EX',
-            7 * 24 * 60 * 60
-        );
+        expect(mockRedis.set).toHaveBeenCalledWith('refresh:1', sha('refresh_token'), 'EX', 7 * 24 * 60 * 60);
     });
 
     it('should generate tokens', async () => {

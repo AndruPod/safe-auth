@@ -1,94 +1,54 @@
 # Safe Auth Service
 
-A production-ready, highly secure authentication and user management backend service built with **Nest.js**, **TypeScript**, and **Drizzle ORM**. This project demonstrates modern architectural patterns, secure token management, caching strategies, and extensive automated testing workflows.
+An authentication backend built with NestJS, PostgreSQL (Drizzle ORM) and Redis.
+This is a portfolio project. It has not been audited or deployed to production.
 
-## 🚀 Key Features
+## Features
 
-*   **Robust Authentication:** Secure SignUp and Login endpoints utilizing industry-standard password hashing (bcrypt) and validation layers.
-*   **Token Management:** Dual-token mechanism using short-lived **JWT access tokens** and secure **refresh tokens**.
-*   **High-Performance Caching:** Integrated **Redis** layer for session caching, token blacklisting, and reducing relational database overhead.
-*   **Modern Data Layer:** Implemented with **Drizzle ORM** for type-safe database queries, structured schemas, and automated migration generation.
-*   **Dockerized Infrastructure:** Multi-container setup containing the application, PostgreSQL database, and Redis instance for seamless local orchestration.
-*   **Enterprise-Grade Testing:** Full test suite covering Unit tests (`jest`) and End-to-End (`e2e`) API integration flows with Istanbul coverage tracking.
+- Sign-up and login with bcrypt password hashing
+- Short-lived JWT access tokens (15 minutes) and refresh tokens (7 days)
+- Refresh token rotation: each token works once. Redis stores only its SHA-256 hash,
+  and it is consumed atomically
+- Logout revokes the current refresh token
+- Password hashes are never returned by the API
 
-## 🛠️ Tech Stack
+## API
 
-*   **Runtime & Framework:** Node.js, Nest.js, TypeScript
-*   **Database & ORM:** PostgreSQL, Drizzle ORM
-*   **Caching & Session:** Redis
-*   **Testing & QA:** Jest, Supertest, Istanbul (Coverage)
-*   **DevOps & Tooling:** Docker, Docker Compose, Prettier, ESLint
+| Method | Path            | Input                                    |
+| ------ | --------------- | ---------------------------------------- |
+| POST   | `/auth/sign-up` | `{ email, password, confirmedPassword }` |
+| POST   | `/auth/login`   | `{ email, password }`                    |
+| GET    | `/auth`         | `Authorization: Bearer <access_token>`   |
+| POST   | `/auth/refresh` | `{ refresh }`                            |
+| POST   | `/auth/logout`  | `{ refresh }`                            |
 
-## 📂 Project Structure Overview
+## Run with Docker
 
-```text
-src/
-├── auth/           # Authentication logic (controllers, services, JWT DTOs)
-├── db/             # Database modules, Drizzle providers, schemas, and migrations
-├── users/          # User management core domain
-├── redis/          # Redis integration and caching providers
-├── app.module.ts   # Main application root module
-└── main.ts         # Application entry point & global pipes configuration
+```bash
+cp .env.example .env   # set DB_PASSWORD and both JWT secrets
+docker compose up --build
 ```
 
-## ⚙️ Getting Started
-### Prerequisites
+## Run locally
 
-Make sure you have Docker and Node.js (v18+) installed on your system.
-
-#### 1. Environment Setup
-
-Clone the repository and create your .env file based on the provided example:
-
-```
+```bash
 cp .env.example .env
-```
-
-Configure your JWT secrets, database credentials, and Redis ports inside the .env file.
-#### 2. Run Infrastructure via Docker
-
-Spin up the PostgreSQL database and Redis instance in the background:
-Bash
-```
-docker-compose up -d
-```
-
-#### 3. Install Dependencies
-```
-npm install
-```
-
-#### 4. Database Migrations
-
-Generate and apply Drizzle database migrations to set up your PostgreSQL schemas:
-Bash
-
-```
-# Apply pending migrations to the database
+docker compose up -d db redis
+npm ci
+set -a; . ./.env; set +a   # drizzle-kit reads the database settings from the shell
 npm run db:migrate
-```
-
-#### 5. Running the Application
-```
-# Development mode
 npm run start:dev
-
-# Production mode
-npm run start:prod
 ```
 
-# Testing & Code Coverage
+## Tests
 
-The project maintains high code quality standards backed by structured test automation runner scripts.
-```
-# Run unit tests
-npm run test
-
-# Run End-to-End (E2E) integration tests
-npm run test:e2e
-
-# Generate test coverage reports
-npm run test:cov
+```bash
+npm test           # unit tests
+npm run test:e2e   # needs the migrated database, Redis and the env variables above
 ```
 
-E2E test results and HTML coverage visualizers will be compiled into the /coverage and /coverage-e2e directories respectively.
+## Limitations
+
+- One active refresh token per user: a new login ends the previous session
+- Logout does not revoke an already issued access token (it expires within 15 minutes)
+- No rate limiting, email verification, password reset or roles yet

@@ -10,6 +10,16 @@ import { UsersService } from '../users/users.service';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import Redis from 'ioredis';
+import { createHash, randomUUID, timingSafeEqual } from 'crypto';
+
+// Deletes the key only if it still holds the expected value (one atomic step),
+// so a refresh token can be used at most once, even by concurrent requests.
+const CONSUME_SCRIPT = `
+if redis.call('get', KEYS[1]) == ARGV[1] then
+    return redis.call('del', KEYS[1])
+end
+return 0
+`;
 
 @Injectable()
 export class AuthService {
@@ -62,10 +72,14 @@ export class AuthService {
             expiresIn: '15m',
         });
 
-        const refreshToken = await this.jwtService.signAsync(payload, {
-            secret: process.env.JWT_REFRESH_SECRET,
-            expiresIn: '7d',
-        });
+        // jti makes every refresh token unique, even within the same second
+        const refreshToken = await this.jwtService.signAsync(
+            { ...payload, jti: randomUUID() },
+            {
+                secret: process.env.JWT_REFRESH_SECRET,
+                expiresIn: '7d',
+            },
+        );
 
         await this.saveRefreshToken(userId, refreshToken);
 
@@ -75,66 +89,75 @@ export class AuthService {
         };
     }
 
-    private async saveRefreshToken(userId: number, refreshToken: string) {
-        const hashed = await bcrypt.hash(refreshToken, 10);
+    // bcrypt only reads the first 72 bytes, which are identical for one user's JWTs.
+    // SHA-256 covers the whole token.
+    private hashToken(token: string): string {
+        return createHash('sha256').update(token).digest('hex');
+    }
 
+    private async saveRefreshToken(userId: number, refreshToken: string) {
         await this.redis.set(
             `refresh:${userId}`,
-            hashed,
+            this.hashToken(refreshToken),
             'EX',
             7 * 24 * 60 * 60,
         );
     }
 
-    async refresh(userId: number, refreshToken: string) {
-
-        let payload;
+    private async verifyRefreshToken(refreshToken: string): Promise<{ id: number }> {
         try {
-            payload = await this.jwtService.verifyAsync(refreshToken, {
+            return await this.jwtService.verifyAsync(refreshToken, {
                 secret: process.env.JWT_REFRESH_SECRET,
             });
         } catch {
             throw new UnauthorizedException('Invalid refresh token');
         }
+    }
 
-        const stored = await this.redis.get(`refresh:${userId}`);
+    private async consumeRefreshToken(userId: number, refreshToken: string) {
+        const key = `refresh:${userId}`;
+        const stored = await this.redis.get(key);
         if (!stored)
             throw new UnauthorizedException('No refresh token');
 
-        const isMatch = await bcrypt.compare(refreshToken, stored);
-        if (!isMatch)
+        const actual = Buffer.from(this.hashToken(refreshToken));
+        const expected = Buffer.from(stored);
+        if (actual.length !== expected.length || !timingSafeEqual(actual, expected))
             throw new UnauthorizedException('Invalid refresh token');
 
-        const user = await this.usersService.findOneById(userId);
+        const consumed = await this.redis.eval(CONSUME_SCRIPT, 1, key, stored);
+        if (consumed !== 1)
+            throw new UnauthorizedException('Invalid refresh token');
+    }
 
+    async refresh(refreshToken: string) {
+        const { id } = await this.verifyRefreshToken(refreshToken);
+        await this.consumeRefreshToken(id, refreshToken);
+
+        const user = await this.usersService.findOneById(id);
         if (!user)
             throw new UnauthorizedException();
 
-        await this.redis.del(`refresh:${userId}`);
         return this.generateTokens(user.id, user.email);
     }
 
     async logout(refreshToken: string) {
-
-        let payload;
-        try {
-            payload = await this.jwtService.verifyAsync(refreshToken, {
-                secret: process.env.JWT_REFRESH_SECRET,
-            });
-        } catch {
-            throw new UnauthorizedException('Invalid refresh token');
-        }
-
-        await this.redis.del(`refresh:${payload.id}`);
+        const { id } = await this.verifyRefreshToken(refreshToken);
+        await this.consumeRefreshToken(id, refreshToken);
         return { message: 'Logged out' };
     }
 
     async getUser(token: string) {
+        let id: number;
         try {
-            const {id} = this.jwtService.verify(token);
-            return await this.usersService.findOneById(id);
-        } catch (e) {
+            ({ id } = this.jwtService.verify(token));
+        } catch {
             throw new UnauthorizedException('Invalid token');
         }
+
+        const user = await this.usersService.findOneById(id);
+        if (!user)
+            throw new UnauthorizedException('Invalid token');
+        return user;
     }
 }
