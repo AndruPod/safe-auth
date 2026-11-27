@@ -34,8 +34,8 @@ describe('AuthController', () => {
     });
 
     it('should call refresh', async () => {
-        await controller.refresh(1, 'token');
-        expect(mockAuthService.refresh).toHaveBeenCalledWith(1, 'token');
+        await controller.refresh('token');
+        expect(mockAuthService.refresh).toHaveBeenCalledWith('token');
     });
 
     it('should call logout', async () => {

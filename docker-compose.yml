@@ -1,46 +1,49 @@
-version: '3.9'
-
 services:
   app:
     build: .
-    container_name: nest-app
     restart: unless-stopped
     ports:
       - "3000:3000"
     environment:
-      NODE_ENV: development
       PORT: 3000
-      DATABASE_URL: postgres://postgres:postgres@db:5432/nestdb
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+      DB_NAME: nestdb
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      JWT_SECRET: supersecretkey
-      JWT_REFRESH_SECRET: superrefreshkey
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?set JWT_REFRESH_SECRET in .env}
     depends_on:
-      - db
-      - redis
-    volumes:
-      - .:/usr/src/app
-    command: sh -c "npx wait-port db:5432 && npx drizzle-kit push && npm run start:dev"
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    command: sh -c "npm run db:migrate && node dist/main.js"
 
   db:
     image: postgres:15
-    container_name: nest-postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
       POSTGRES_DB: nestdb
     ports:
-      - "5433:5432"
+      - "127.0.0.1:5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d nestdb"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
 
   redis:
     image: redis:7
-    container_name: nest-redis
     restart: unless-stopped
     ports:
-      - "6380:6379"
+      - "127.0.0.1:6380:6379"
     volumes:
       - redisdata:/data
 

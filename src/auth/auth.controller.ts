@@ -3,7 +3,6 @@ import {
     Get,
     Post,
     Body,
-    Query,
     Headers
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
@@ -31,11 +30,8 @@ export class AuthController {
     }
 
     @Post('refresh')
-    refresh(
-        @Query('userId') userId: number,
-        @Body('refresh') refreshToken: string,
-    ) {
-        return this.authService.refresh(Number(userId), refreshToken);
+    refresh(@Body('refresh') refreshToken: string) {
+        return this.authService.refresh(refreshToken);
     }
 
     @Post('logout')
